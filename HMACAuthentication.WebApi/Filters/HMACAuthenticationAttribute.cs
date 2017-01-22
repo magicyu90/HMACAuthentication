@@ -104,6 +104,7 @@ namespace HMACAuthentication.WebApi.Filters
 
             var sharedKey = allowedApps[appId];
 
+            var contentStr = await req.Content.ReadAsStringAsync();
             var requestContentBytesArray = await req.Content.ReadAsByteArrayAsync();
 
             MD5 md5 = MD5.Create();
@@ -120,7 +121,8 @@ namespace HMACAuthentication.WebApi.Filters
             using (var hmac = new HMACSHA256(secretKey))
             {
                 byte[] signatureBytes = hmac.ComputeHash(signature);
-                return inComingBase64String.Equals(Convert.ToBase64String(signatureBytes), StringComparison.OrdinalIgnoreCase);
+                string outComingBase64String = Convert.ToBase64String(signatureBytes);
+                return inComingBase64String.Equals(outComingBase64String, StringComparison.OrdinalIgnoreCase);
             }
 
         }

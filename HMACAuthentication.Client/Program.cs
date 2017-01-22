@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using Newtonsoft.Json;
 
 namespace HMACAuthentication.Client
 {
@@ -16,17 +17,36 @@ namespace HMACAuthentication.Client
     {
         static void Main(string[] args)
         {
-            GenerateAppKey();
-            Console.ReadKey();
+
+            Console.WriteLine("type A to launch the client,type Q to quit");
+
+            bool b = true;
+            while (b)
+            {
+                Console.WriteLine("Input the numer.....");
+
+                ConsoleKeyInfo key = Console.ReadKey();
+
+                switch (key.Key)
+                {
+                    case ConsoleKey.A:
+                        RunAsync().Wait();
+                        break;
+                    case ConsoleKey.Q:
+                        b = false;
+                        break;
+                }
+            }
+
         }
 
 
-        private async Task RunAsync()
+        private static async Task RunAsync()
         {
 
             Console.WriteLine("Calling the back-end api");
 
-            string baseAddress = "http://localhost";
+            string baseAddress = "http://localhost:62599";
             var handler = new CustomDelegatingHandler();
 
             var client = HttpClientFactory.Create(handler);
@@ -38,6 +58,8 @@ namespace HMACAuthentication.Client
                 IsShipped = true,
                 ShipperCity = "Paris"
             };
+
+            string str = JsonConvert.SerializeObject(order);
 
             var response = await client.PostAsJsonAsync(baseAddress + "/api/orders", order);
 
@@ -67,7 +89,6 @@ namespace HMACAuthentication.Client
 
                 Console.WriteLine("apiKey:" + apiKey);
             }
-
         }
 
     }
@@ -92,6 +113,7 @@ namespace HMACAuthentication.Client
 
             if (request.Content != null)
             {
+                string contentStr = await request.Content.ReadAsStringAsync();
                 byte[] content = await request.Content.ReadAsByteArrayAsync();
                 MD5 md5 = MD5.Create();
                 byte[] requestContentHash = md5.ComputeHash(content);
@@ -100,18 +122,21 @@ namespace HMACAuthentication.Client
 
             string signatureRawData = $"{APPId}{requestMethod}{requestUri}{utcRequest}{nonce}{requestContentString}";
 
-            byte[] secretBytesArray = Encoding.UTF8.GetBytes(signatureRawData);
+            byte[] signatureBytesArray = Encoding.UTF8.GetBytes(signatureRawData);
+
+            byte[] secretBytesArray = Convert.FromBase64String(APIKey);
+
 
             using (var hmac = new HMACSHA256(secretBytesArray))
             {
-                string requestSignatureBase64String = Convert.ToBase64String(hmac.ComputeHash(secretBytesArray));
+                string requestSignatureBase64String = Convert.ToBase64String(hmac.ComputeHash(signatureBytesArray));
 
                 request.Headers.Authorization = new AuthenticationHeaderValue("amx", $"{APPId}:{requestSignatureBase64String}:{nonce}:{utcRequest}");
             }
 
-            return await base.SendAsync(request, cancellationToken);
+            response = await base.SendAsync(request, cancellationToken);
 
-            //return base.SendAsync(request, cancellationToken);
+            return response;
         }
     }
 }
